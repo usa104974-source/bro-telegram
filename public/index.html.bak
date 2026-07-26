@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BRO CHAT LUXE</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { background: #0f0f12; color: #fff; font-family: sans-serif; margin: 0; padding: 15px; }
+    h2 { color: #ff9900; margin-top: 0; }
+    .card { background: #1a1a24; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #2a2a3a; }
+    input, select, button { width: 100%; padding: 12px; margin: 6px 0; border-radius: 8px; border: 1px solid #3a3a4a; background: #252535; color: #fff; font-size: 14px; }
+    button { background: #ff9900; color: #000; font-weight: bold; border: none; cursor: pointer; }
+    .chat-box { height: 350px; overflow-y: auto; padding: 10px; background: #121218; border-radius: 8px; border: 1px solid #2a2a3a; margin-bottom: 10px; white-space: pre-wrap; }
+    .msg { margin-bottom: 10px; word-break: break-word; }
+    .msg-sender { font-weight: bold; color: #ff9900; font-size: 12px; display: block; }
+    .nav-btns { display: flex; gap: 8px; margin-bottom: 15px; }
+    .nav-btns button { flex: 1; background: #252535; color: #fff; }
+    .nav-btns button.active { background: #ff9900; color: #000; }
+    .admin-panel { border: 1px solid #ff3333; }
+    .auction-item { background: #252535; padding: 10px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  </style>
+</head>
+<body>
+
+  <div id="login-block" class="card">
+    <h2>🔥 BRO CHAT</h2>
+    <p>Вход по номеру телефона:</p>
+    <input type="text" id="phone" placeholder="+79586491727">
+    <button onclick="login()">ВОЙТИ В ИМПЕРИЮ</button>
+  </div>
+
+  <div id="app-block" style="display:none;">
+    <div class="card">
+      <div>ID: <b id="my-id" style="color: #ff9900;">...</b> | 2-й ID: <b id="my-custom-id" style="color: #00ccff;">Нет</b></div>
+      <div>Баланс: ✨<b id="my-stars">0</b></div>
+    </div>
+
+    <div class="nav-btns">
+      <button id="btn-chat" class="active" onclick="showTab('chat')">💬 Чаты</button>
+      <button id="btn-auction" onclick="showTab('auction')">🏛️ Аукцион</button>
+      <button id="btn-admin" style="display:none; background: #ff3333; color: #fff;" onclick="showTab('admin')">👑 Админка</button>
+    </div>
+
+    <!-- ЧАТЫ -->
+    <div id="tab-chat" class="card">
+      <select id="chat-type" onchange="switchChat()">
+        <option value="global">🌐 Общий Чат</option>
+        <option value="ai">🤖 ИИ Брат (AXL)</option>
+        <option value="private">🔒 Личка по ID</option>
+      </select>
+
+      <div id="private-id-block" style="display:none;">
+        <input type="text" id="target-id" placeholder="Введи ID собеседника">
+      </div>
+
+      <div class="chat-box" id="messages"></div>
+      <input type="text" id="msg-input" placeholder="Напиши сообщение (или #разраб запрос)...">
+      <button onclick="sendMsg()">Отправить</button>
+    </div>
+
+    <!-- АУКЦИОН -->
+    <div id="tab-auction" class="card" style="display:none;">
+      <h3>🏛️ Аукцион ID</h3>
+      
+      <div style="border-bottom: 1px solid #333; padding-bottom: 10px;">
+        <h4>Купить Блатной системный ID (100 ✨)</h4>
+        <input type="text" id="buy-sys-id" placeholder="Например: 777888">
+        <button onclick="buySystemId()">Купить за 100 ✨</button>
+      </div>
+
+      <div style="margin-top: 10px;">
+        <h4>Продать свой2-й ID:</h4>
+        <input type="number" id="sell-price" placeholder="Цена в ✨">
+        <button onclick="sellMyId()">Выставить на продажу</button>
+      </div>
+
+      <div style="margin-top: 15px;">
+        <h4>Лоты игроков:</h4>
+        <div id="auction-list">Загрузка лотов...</div>
+      </div>
+    </div>
+
+    <!-- АДМИНКА -->
+    <div id="tab-admin" class="card admin-panel" style="display:none;">
+      <h3 style="color: #ff3333;">👑 Власть БОССА (ID 666666)</h3>
+      
+      <h4>1. Выдать ЛЮБОЙ ID человеку:</h4>
+      <input type="text" id="give-phone" placeholder="Номер юзера (например 89991112233)">
+      <input type="text" id="give-id" placeholder="Желаемый ID (например 000001 или 1488)">
+      <button style="background: #00cc66; color: #fff;" onclick="giveId()">ВЫДАТЬ ID</button>
+
+      <h4 style="margin-top: 15px;">2. Забрать ID в казну:</h4>
+      <input type="text" id="revoke-phone" placeholder="Номер юзера">
+      <button style="background: #ff3333; color: #fff;" onclick="revokeId()">ЗАБРАТЬ ID НАХУЙ</button>
+    </div>
+
+  </div>
+
+  <script>
+    const socket = io();
+    let currentUser = null;
+
+    async function login() {
+      const phone = document.getElementById('phone').value;
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ phone })
+      });
+      currentUser = await res.json();
+      
+      document.getElementById('login-block').style.display = 'none';
+      document.getElementById('app-block').style.display = 'block';
+      
+      updateUI();
+
+      if(currentUser.isAdmin) {
+        document.getElementById('btn-admin').style.display = 'block';
+      }
+    }
+
+    function updateUI() {
+      document.getElementById('my-id').innerText = currentUser.systemId;
+      document.getElementById('my-custom-id').innerText = currentUser.customId || 'Нет';
+      document.getElementById('my-stars').innerText = currentUser.stars;
+    }
+
+    function showTab(tabName) {
+      document.getElementById('tab-chat').style.display = tabName === 'chat' ? 'block' : 'none';
+      document.getElementById('tab-auction').style.display = tabName === 'auction' ? 'block' : 'none';
+      document.getElementById('tab-admin').style.display = tabName === 'admin' ? 'block' : 'none';
+
+      if(tabName === 'auction') loadAuction();
+    }
+
+    async function loadAuction() {
+      const res = await fetch('/api/auction/list');
+      const items = await res.json();
+      const list = document.getElementById('auction-list');
+      
+      if(items.length === 0) {
+        list.innerHTML = '<p style="color: #888;">Сейчас нет активных лотов от игроков</p>';
+        return;
+      }
+
+      list.innerHTML = items.map(item => `
+        <div class="auction-item">
+          <div><b>ID: ${item.idForSale}</b> (Продавец: ${item.sellerName})</div>
+          <div><b>✨ ${item.price}</b></div>
+        </div>
+      `).join('');
+    }
+
+    async function buySystemId() {
+      const targetId = document.getElementById('buy-sys-id').value;
+      const res = await fetch('/api/auction/buy-system-id', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ phone: currentUser.phone, targetId })
+      });
+      const data = await res.json();
+      if(data.success) {
+        currentUser.customId = data.customId;
+        currentUser.stars = data.stars;
+        updateUI();
+        alert('Поздравляем! Новый ID куплен!');
+      } else {
+        alert(data.error);
+      }
+    }
+
+    async function sellMyId() {
+      const price = document.getElementById('sell-price').value;
+      const res = await fetch('/api/auction/sell', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ phone: currentUser.phone, price })
+      });
+      const data = await res.json();
+      alert(data.message || data.error);
+      if(data.success) {
+        currentUser.customId = null;
+        updateUI();
+        loadAuction();
+      }
+    }
+
+    async function giveId() {
+      const targetPhone = document.getElementById('give-phone').value;
+      const newId = document.getElementById('give-id').value;
+      const res = await fetch('/api/admin/give-id', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ adminPhone: currentUser.phone, targetPhone, newId })
+      });
+      const data = await res.json();
+      alert(data.message || data.error);
+    }
+
+    async function revokeId() {
+      const targetPhone = document.getElementById('revoke-phone').value;
+      const res = await fetch('/api/admin/revoke-id', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ adminPhone: currentUser.phone, targetPhone })
+      });
+      const data = await res.json();
+      alert(data.message || data.error);
+    }
+
+    function switchChat() {
+      const type = document.getElementById('chat-type').value;
+      document.getElementById('private-id-block').style.display = type === 'private' ? 'block' : 'none';
+      document.getElementById('messages').innerHTML = '';
+    }
+
+    function sendMsg() {
+      const text = document.getElementById('msg-input').value;
+      const chatType = document.getElementById('chat-type').value;
+      const targetId = document.getElementById('target-id').value;
+      if(!text) return;
+
+      const myActiveId = currentUser.customId || currentUser.systemId;
+
+      socket.emit('send_message', {
+        sender: myActiveId,
+        text,
+        chatType,
+        targetId: chatType === 'private' ? targetId : null
+      });
+      document.getElementById('msg-input').value = '';
+    }
+
+    socket.on('receive_message', (data) => {
+      const currentChatType = document.getElementById('chat-type').value;
+      const myActiveId = currentUser.customId || currentUser.systemId;
+
+      if (data.chatType === 'private') {
+        if (data.targetId !== myActiveId && data.sender !== myActiveId) return;
+      } else if (data.chatType !== currentChatType) {
+        return;
+      }
+
+      const box = document.getElementById('messages');
+      box.innerHTML += `<div class="msg"><span class="msg-sender">${data.sender}:</span> ${data.text}</div>`;
+      box.scrollTop = box.scrollHeight;
+    });
+  </script>
+</body>
+</html>
