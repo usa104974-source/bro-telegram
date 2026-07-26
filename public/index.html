@@ -12,15 +12,19 @@
     .card { background: #1a1a24; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #2a2a3a; }
     input, select, button { width: 100%; padding: 12px; margin: 6px 0; border-radius: 8px; border: 1px solid #3a3a4a; background: #252535; color: #fff; font-size: 14px; }
     button { background: #ff9900; color: #000; font-weight: bold; border: none; cursor: pointer; }
-    .chat-box { height: 350px; overflow-y: auto; padding: 10px; background: #121218; border-radius: 8px; border: 1px solid #2a2a3a; margin-bottom: 10px; white-space: pre-wrap; }
-    .msg { margin-bottom: 10px; word-break: break-word; }
-    .msg-sender { font-weight: bold; color: #ff9900; font-size: 12px; display: block; }
+    .chat-box { height: 350px; overflow-y: auto; padding: 10px; background: #121218; border-radius: 8px; border: 1px solid #2a2a3a; margin-bottom: 10px; }
+    
+    /* СТИЛИ АВАТАРОК */
+    .msg { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+    .avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #ff9900; background: #252535; }
+    .msg-content { flex: 1; word-break: break-word; }
+    .msg-sender { font-weight: bold; color: #ff9900; font-size: 12px; }
+    
     .nav-btns { display: flex; gap: 8px; margin-bottom: 15px; }
     .nav-btns button { flex: 1; background: #252535; color: #fff; }
     .nav-btns button.active { background: #ff9900; color: #000; }
     .admin-panel { border: 1px solid #ff3333; }
-    .auction-item { background: #252535; padding: 10px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-    .avatar { width: 30px; height: 30px; border-radius: 50%; margin-right: 10px; }
+    .user-info { display: flex; align-items: center; gap: 12px; }
   </style>
 </head>
 <body>
@@ -33,9 +37,12 @@
   </div>
 
   <div id="app-block" style="display:none;">
-    <div class="card">
-      <div><img class="avatar" id="user-avatar" src=""> ID: <b id="my-id" style="color: #ff9900;">...</b> | 2-й ID: <b id="my-custom-id" style="color: #00ccff;">Нет</b></div>
-      <div>Баланс: ✨<b id="my-stars">0</b></div>
+    <div class="card user-info">
+      <img id="my-avatar" class="avatar" src="" alt="Avatar">
+      <div>
+        <div>ID: <b id="my-id" style="color: #ff9900;">...</b> | 2-й ID: <b id="my-custom-id" style="color: #00ccff;">Нет</b></div>
+        <div>Баланс: ✨<b id="my-stars">0</b></div>
+      </div>
     </div>
 
     <div class="nav-btns">
@@ -57,26 +64,23 @@
       </div>
 
       <div class="chat-box" id="messages"></div>
-      <input type="text" id="msg-input" placeholder="Напиши сообщение (или #разраб запрос)...">
+<input type="text" id="msg-input" placeholder="Напиши сообщение...">
       <button onclick="sendMsg()">Отправить</button>
     </div>
 
     <!-- АУКЦИОН -->
     <div id="tab-auction" class="card" style="display:none;">
       <h3>🏛️ Аукцион ID</h3>
-      
       <div style="border-bottom: 1px solid #333; padding-bottom: 10px;">
         <h4>Купить Блатной системный ID (100 ✨)</h4>
         <input type="text" id="buy-sys-id" placeholder="Например: 777888">
         <button onclick="buySystemId()">Купить за 100 ✨</button>
       </div>
-
       <div style="margin-top: 10px;">
-        <h4>Продать свой2-й ID:</h4>
+        <h4>Продать свой 2-й ID:</h4>
         <input type="number" id="sell-price" placeholder="Цена в ✨">
         <button onclick="sellMyId()">Выставить на продажу</button>
       </div>
-
       <div style="margin-top: 15px;">
         <h4>Лоты игроков:</h4>
         <div id="auction-list">Загрузка лотов...</div>
@@ -86,12 +90,10 @@
     <!-- АДМИНКА -->
     <div id="tab-admin" class="card admin-panel" style="display:none;">
       <h3 style="color: #ff3333;">👑 Власть БОССА (ID 666666)</h3>
-      
       <h4>1. Выдать ЛЮБОЙ ID человеку:</h4>
-      <input type="text" id="give-phone" placeholder="Номер юзера (например 89991112233)">
-      <input type="text" id="give-id" placeholder="Желаемый ID (например 000001 или 1488)">
+      <input type="text" id="give-phone" placeholder="Номер юзера">
+      <input type="text" id="give-id" placeholder="Желаемый ID">
       <button style="background: #00cc66; color: #fff;" onclick="giveId()">ВЫДАТЬ ID</button>
-
       <h4 style="margin-top: 15px;">2. Забрать ID в казну:</h4>
       <input type="text" id="revoke-phone" placeholder="Номер юзера">
       <button style="background: #ff3333; color: #fff;" onclick="revokeId()">ЗАБРАТЬ ID НАХУЙ</button>
@@ -102,11 +104,6 @@
   <script>
     const socket = io();
     let currentUser = null;
-    let avatars = {
-      "default": "https://example.com/default-avatar.png",
-      "1": "https://example.com/avatar1.png",
-      "2": "https://example.com/avatar2.png",
-    };
 
     async function login() {
       const phone = document.getElementById('phone').value;
@@ -120,8 +117,14 @@
       document.getElementById('login-block').style.display = 'none';
       document.getElementById('app-block').style.display = 'block';
       
+      // НАДЕЖНЫЙ PNG СЕРВИС РОБОХЭШ
+      const activeId = currentUser.customId || currentUser.systemId;
+      const avatarUrl = currentUser.isAdmin 
+        ? 'https://robohash.org/Boss666666.png?set=set1' 
+        : `https://robohash.org/${activeId}.png?set=set3`;
+      
+      document.getElementById('my-avatar').src = avatarUrl;
       updateUI();
-      updateAvatar();
 
       if(currentUser.isAdmin) {
         document.getElementById('btn-admin').style.display = 'block';
@@ -134,20 +137,10 @@
       document.getElementById('my-stars').innerText = currentUser.stars;
     }
 
-    function updateAvatar() {
-      const userAvatar = document.getElementById('user-avatar');
-      if (avatars[currentUser.systemId]) {
-        userAvatar.src = avatars[currentUser.systemId];
-      } else {
-        userAvatar.src = avatars["default"];
-      }
-    }
-
     function showTab(tabName) {
       document.getElementById('tab-chat').style.display = tabName === 'chat' ? 'block' : 'none';
       document.getElementById('tab-auction').style.display = tabName === 'auction' ? 'block' : 'none';
       document.getElementById('tab-admin').style.display = tabName === 'admin' ? 'block' : 'none';
-
       if(tabName === 'auction') loadAuction();
     }
 
@@ -155,75 +148,15 @@
       const res = await fetch('/api/auction/list');
       const items = await res.json();
       const list = document.getElementById('auction-list');
-      
       if(items.length === 0) {
         list.innerHTML = '<p style="color: #888;">Сейчас нет активных лотов от игроков</p>';
         return;
       }
-
       list.innerHTML = items.map(item => `
-        <div class="auction-item">
-          <div><img class="avatar" src="${avatars[item.sellerId] || avatars['default']}"> <b>ID: ${item.idForSale}</b> (Продавец: ${item.sellerName})</div>
-          <div><b>✨ ${item.price}</b></div>
+        <div style="background:#252535; padding:8px; border-radius:6px; margin-bottom:5px;">
+          <b>ID: ${item.idForSale}</b> | ✨ ${item.price}
         </div>
       `).join('');
-    }
-
-    async function buySystemId() {
-      const targetId = document.getElementById('buy-sys-id').value;
-      const res = await fetch('/api/auction/buy-system-id', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ phone: currentUser.phone, targetId })
-      });
-      const data = await res.json();
-      if(data.success) {
-        currentUser.customId = data.customId;
-        currentUser.stars = data.stars;
-        updateUI();
-        alert('Поздравляем! Новый ID куплен!');
-      } else {
-        alert(data.error);
-      }
-    }
-
-    async function sellMyId() {
-      const price = document.getElementById('sell-price').value;
-      const res = await fetch('/api/auction/sell', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ phone: currentUser.phone, price })
-      });
-      const data = await res.json();
-      alert(data.message || data.error);
-      if(data.success) {
-        currentUser.customId = null;
-        updateUI();
-        loadAuction();
-      }
-    }
-
-    async function giveId() {
-      const targetPhone = document.getElementById('give-phone').value;
-      const newId = document.getElementById('give-id').value;
-      const res = await fetch('/api/admin/give-id', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ adminPhone: currentUser.phone, targetPhone, newId })
-      });
-      const data = await res.json();
-      alert(data.message || data.error);
-    }
-
-    async function revokeId() {
-      const targetPhone = document.getElementById('revoke-phone').value;
-      const res = await fetch('/api/admin/revoke-id', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ adminPhone: currentUser.phone, targetPhone })
-      });
-      const data = await res.json();
-      alert(data.message || data.error);
     }
 
     function switchChat() {
@@ -232,16 +165,19 @@
       document.getElementById('messages').innerHTML = '';
     }
 
-    function sendMsg() {
-      const text = document.getElementById('msg-input').value;
+    function sendMsg() {const text = document.getElementById('msg-input').value;
       const chatType = document.getElementById('chat-type').value;
       const targetId = document.getElementById('target-id').value;
       if(!text) return;
 
       const myActiveId = currentUser.customId || currentUser.systemId;
+      const avatarUrl = currentUser.isAdmin 
+        ? 'https://robohash.org/Boss666666.png?set=set1' 
+        : `https://robohash.org/${myActiveId}.png?set=set3`;
 
       socket.emit('send_message', {
         sender: myActiveId,
+        avatar: avatarUrl,
         text,
         chatType,
         targetId: chatType === 'private' ? targetId : null
@@ -259,8 +195,17 @@
         return;
       }
 
+      const avatar = data.avatar || 'https://robohash.org/AI_AXL.png?set=set1';
+
       const box = document.getElementById('messages');
-      box.innerHTML += `<div class="msg"><img class="avatar" src="${avatars[data.sender] || avatars['default']}"><span class="msg-sender">${data.sender}:</span> ${data.text}</div>`;
+      box.innerHTML += `
+        <div class="msg">
+          <img class="avatar" src="${avatar}">
+          <div class="msg-content">
+            <span class="msg-sender">${data.sender}:</span>
+            <div>${data.text}</div>
+          </div>
+        </div>`;
       box.scrollTop = box.scrollHeight;
     });
   </script>
