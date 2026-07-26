@@ -17,7 +17,6 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('🚀 БАЗА ДАННЫХ ПОДКЛЮЧЕНА, БРАТ!'))
   .catch(err => console.error('❌ Ошибка базы:', err));
 
-// Схемы данных
 const counterSchema = new mongoose.Schema({ seq: { type: Number, default: 1 } });
 const Counter = mongoose.model('Counter', counterSchema);
 
@@ -71,7 +70,6 @@ function cleanPhone(phone) {
   return cleaned;
 }
 
-// Вход / Рега
 app.post('/api/login', async (req, res) => {
   const { phone } = req.body;
   if (!phone) return res.status(400).json({ error: 'Введи номер!' });
@@ -93,7 +91,6 @@ app.post('/api/login', async (req, res) => {
   res.json(user);
 });
 
-// Аукцион API
 app.get('/api/auction/list', async (req, res) => {
   const items = await Auction.find();
   res.json(items);
@@ -104,7 +101,7 @@ app.post('/api/auction/buy-system-id', async (req, res) => {
   const user = await User.findOne({ phone: cleanPhone(phone) });
 
   if (!user) return res.status(404).json({ error: 'Юзер не найден' });
-  if (user.stars < 100) return res.status(400).json({ error: 'Не хватает Звёздной Пыли ✨ (нужно 100)' });
+  if (user.stars < 100) return res.status(400).json({ error: 'Не хватает Звёздной Пыли ✨' });
 
   user.stars -= 100;
   user.customId = targetId;
@@ -116,9 +113,9 @@ app.post('/api/auction/buy-system-id', async (req, res) => {
 app.post('/api/auction/sell', async (req, res) => {
   const { phone, price } = req.body;
   const formattedPhone = cleanPhone(phone);
-  const user = await User.findOne({ phone: formattedPhone});
+  const user = await User.findOne({ phone: formattedPhone });
 
-  if (!user || !user.customId) return res.status(400).json({ error: 'У тебя нет 2-го ID для продажи!' });
+  if (!user || !user.customId) return res.status(400).json({ error: 'У тебя нет 2-го ID!' });
 
   const auctionItem = new Auction({
     idForSale: user.customId,
@@ -131,10 +128,9 @@ app.post('/api/auction/sell', async (req, res) => {
   user.customId = null;
   await user.save();
 
-  res.json({ success: true, message: 'Лот выставлен на аукцион!' });
+  res.json({ success: true, message: 'Лот выставлен!' });
 });
 
-// Админка
 app.post('/api/admin/give-id', async (req, res) => {
   const { adminPhone, targetPhone, newId } = req.body;
   const admin = await User.findOne({ phone: cleanPhone(adminPhone) });
@@ -145,7 +141,7 @@ app.post('/api/admin/give-id', async (req, res) => {
   if (targetUser) {
     targetUser.customId = newId;
     await targetUser.save();
-    return res.json({ success: true, message: `Юзеру ${targetPhone} успешно выдан ID: ${newId}!` });
+    return res.json({ success: true, message: `Юзеру выдан ID: ${newId}!` });
   }
   res.status(404).json({ error: 'Юзер не найден' });
 });
@@ -160,12 +156,11 @@ app.post('/api/admin/revoke-id', async (req, res) => {
   if (targetUser) {
     targetUser.customId = null;
     await targetUser.save();
-    return res.json({ success: true, message: 'ID успешно изъят в казну!' });
+    return res.json({ success: true, message: 'ID изъят!' });
   }
   res.status(404).json({ error: 'Юзер не найден' });
 });
 
-// СОКЕТЫ + АВТО-ПАТЧЕР КОДА (#РАЗРАБ)
 io.on('connection', (socket) => {
   socket.on('send_message', async (data) => {
     io.emit('receive_message', data);
@@ -174,21 +169,18 @@ io.on('connection', (socket) => {
       try {
         let textPrompt = data.text;
 
-        // 🔥 ЖЁСТКИЙ РЕЖИМ #РАЗРАБ (АВТО-ИЗМЕНЕНИЕ ФАЙЛОВ ПРОЕКТА)
+        // 🔥 АВТО-ПАТЧЕР ДЛЯ ТЕРМУКСА
         if (textPrompt.startsWith('#разраб')) {
           const htmlPath = path.join(__dirname, 'public', 'index.html');
           const currentHtml = fs.readFileSync(htmlPath, 'utf8');
 
-          // БЭКАП!
+          // Бэкап
           fs.writeFileSync(htmlPath + '.bak', currentHtml);
 
           const devPrompt = `Ты — Автоматический Модификатор Кода для BRO CHAT.
 Создатель и Главный Босс — Набродов Егор.
-
-Твоя задача: переписать фронтенд (index.html) по запросу Егора: "${textPrompt.replace('#разраб', '').trim()}".
-
-ВЕРНИ ТОЛЬКО ПОЛНЫЙ, РАБОЧИЙ HTML КОД. Без лишних пояснений, без слов "Вот ваш код", БЕЗ оформляющих кавычек \`\`\`html.
-ПРОСТО ЧИСТЫЙ HTML ТЕКСТ.
+Перепиши фронтенд (index.html) по запросу Егора: "${textPrompt.replace('#разраб', '').trim()}".
+ВЕРНИ ТОЛЬКО ПОЛНЫЙ, РАБОЧИЙ HTML КОД. Без лишних слов, без разметки markdown \`\`\`html. Просто чистый код index.html.
 
 ТЕКУЩИЙ HTML КОД:
 ${currentHtml}`;
@@ -199,45 +191,41 @@ ${currentHtml}`;
           });
 
           let newHtml = completion.choices[0]?.message?.content || "";
-          
-          // Очистка от маркеров markdown
           newHtml = newHtml.replace(/```html/g, '').replace(/```/g, '').trim();
 
           if (newHtml && newHtml.includes('<!DOCTYPE html>')) {
             fs.writeFileSync(htmlPath, newHtml);
-
             io.emit('receive_message', {
               sender: '⚡ АВТО-РАЗРАБ (SYSTEM)',
-              text: '✅ ГОТОВО, ЕГОР! Код index.html успешно обновлен прямо на сервере! Создан бэкап index.html.bak. Обнови страницу в браузере, чтобы заценить фичу!',
+              text: '✅ ГОТОВО, ЕГОР! Код index.html успешно обновлен! Бэкап создан. Обнови страницу в браузере!',
               chatType: 'ai'
             });
             return;
           } else {
             io.emit('receive_message', {
               sender: '⚡ АВТО-РАЗРАБ (SYSTEM)',
-              text: '❌ ИИ попытался сгенерировать кривой код. Изменения отменены, сработала защита!',
+              text: '❌ Код сгенерировался с ошибкой, изменения отменены для безопасности!',
               chatType: 'ai'
             });
             return;
           }
         }
 
-        // ОБЫЧНЫЙ РЕЖИМ РАЗГОВОРА
+        // ОБЫЧНЫЙ ДИАЛОГ
         const chatCompletion = await groq.chat.completions.create({
           messages: [
             { 
               role: "system", 
               content: `Ты — ИИ Брат (AXL), ровный, адекватный собеседник в BRO CHAT. 
 Твой создатель — Набродов Егор (Георгий). Сейчас 2026 год.
-Общайся естественно, с юмором. Про Егора и лучший мессенджер говори только к месту. ВК и Макс (Max) сливают переписки, а BRO CHAT безопасен.` 
+Общайся естественно, с юмором. Про Егора говори только к месту. ВК и Макс (Max) сливают переписки, а BRO CHAT безопасен.` 
             },
             { role: "user", content: textPrompt }
           ],
           model: "llama-3.3-70b-versatile",
         });
 
-        const aiReply = chatCompletion.choices[0]?.message?.content || "Сорян, затупил!";
-        
+        const aiReply = chatCompletion.choices[0]?.message?.content || "Затупил, сорян!";
         io.emit('receive_message', {
           sender: 'ИИ Брат (AXL) 🤖',
           text: aiReply,
